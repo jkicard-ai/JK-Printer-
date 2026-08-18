@@ -1,0 +1,51 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JK Arena</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#070a0f;color:#fff;font-family:Arial,sans-serif;overflow:hidden}
+#hud{position:fixed;top:0;left:0;right:0;height:62px;background:#0d121aee;border-bottom:1px solid #273140;display:flex;align-items:center;gap:22px;padding:0 20px;z-index:2}
+.logo{font-weight:900;font-size:20px}.logo b{color:#ff7a00}.stat{color:#b9c4d2}.stat strong{color:#fff}
+#game{display:block;width:100vw;height:100vh;cursor:crosshair}
+#start{position:fixed;inset:0;background:#05070bd9;display:flex;align-items:center;justify-content:center;z-index:3}
+.card{background:#111722;border:1px solid #344052;border-radius:16px;padding:30px;text-align:center;box-shadow:0 20px 70px #000}
+.card h1{margin:0 0 8px;font-size:42px}.card p{color:#aeb9c8}.play{background:#ff7a00;border:0;color:#111;font-weight:800;border-radius:8px;padding:13px 28px;font-size:18px;cursor:pointer}
+#msg{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:#aeb9c8;background:#0d121add;padding:8px 13px;border-radius:7px;z-index:2}
+</style></head><body>
+<div id="hud"><div class="logo">JK <b>ARENA</b></div><div class="stat">Score <strong id="score">0</strong></div><div class="stat">Health <strong id="hp">100</strong></div><div class="stat">Wave <strong id="wave">1</strong></div><div class="stat">Ammo <strong id="ammo">12</strong></div></div>
+<canvas id="game"></canvas><div id="msg">WASD / Arrow Keys • Mouse Aim • Click Shoot • R Reload</div>
+<div id="start"><div class="card"><h1>JK <span style="color:#ff7a00">ARENA</span></h1><p>Mini browser shooting game — made for GitHub Pages.</p><button class="play" id="play">PLAY NOW</button></div></div>
+<script>
+const c=document.getElementById('game'),x=c.getContext('2d');let W,H,keys={},mouse={x:0,y:0,down:false},running=false,score=0,hp=100,ammo=12,wave=1,enemies=[],bullets=[],particles=[],last=0,spawn=0;
+function resize(){W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio;c.style.width=innerWidth+'px';c.style.height=innerHeight+'px';x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);W=innerWidth;H=innerHeight}
+addEventListener('resize',resize);resize();
+let player={x:innerWidth/2,y:innerHeight/2,r:18,s:280};
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=1;if(e.key.toLowerCase()==='r')ammo=12});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=0);
+c.addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY});c.addEventListener('mousedown',()=>mouse.down=true);addEventListener('mouseup',()=>mouse.down=false);
+function shoot(){if(ammo<=0)return;ammo--;let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);bullets.push({x:player.x,y:player.y,vx:Math.cos(a)*650,vy:Math.sin(a)*650,r:4});}
+function spawnEnemy(){let side=Math.floor(Math.random()*4),px=side<2?(side?W+30:-30):Math.random()*W,py=side<2?Math.random()*H:(side===2?-30:H+30);enemies.push({x:px,y:py,r:16+Math.random()*8,s:55+wave*7,h:2})}
+function boom(px,py){for(let i=0;i<12;i++){let a=Math.random()*6.28,s=40+Math.random()*150;particles.push({x:px,y:py,vx:Math.cos(a)*s,vy:Math.sin(a)*s,t:.4})}}
+function reset(){score=0;hp=100;ammo=12;wave=1;enemies=[];bullets=[];particles=[];player.x=W/2;player.y=H/2;running=true;document.getElementById('start').style.display='none';last=performance.now();requestAnimationFrame(loop)}
+function loop(t){if(!running)return;let dt=Math.min(.033,(t-last)/1000);last=t;update(dt);draw();requestAnimationFrame(loop)}
+function update(dt){
+let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0),len=Math.hypot(dx,dy)||1;player.x=Math.max(25,Math.min(W-25,player.x+dx/len*player.s*dt));player.y=Math.max(85,Math.min(H-25,player.y+dy/len*player.s*dt));
+if(mouse.down&&t-last>120){} // handled below
+if(mouse.down){shoot();mouse.down=false}
+spawn-=dt;if(spawn<=0){spawn=Math.max(.3,1.1-wave*.06);spawnEnemy();if(enemies.length>0&&score>0&&score%10===0)wave=Math.min(20,1+Math.floor(score/10))}
+for(let b of bullets){b.x+=b.vx*dt;b.y+=b.vy*dt}
+bullets=bullets.filter(b=>b.x>-20&&b.x<W+20&&b.y>60&&b.y<H+20);
+for(let e of enemies){let a=Math.atan2(player.y-e.y,player.x-e.x);e.x+=Math.cos(a)*e.s*dt;e.y+=Math.sin(a)*e.s*dt;if(Math.hypot(e.x-player.x,e.y-player.y)<e.r+player.r){hp-=25*dt;}}
+for(let i=enemies.length-1;i>=0;i--){let e=enemies[i];for(let j=bullets.length-1;j>=0;j--){let b=bullets[j];if(Math.hypot(e.x-b.x,e.y-b.y)<e.r+b.r){e.h--;bullets.splice(j,1);boom(e.x,e.y);if(e.h<=0){score++;enemies.splice(i,1)}break}}}
+for(let p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.t-=dt}particles=particles.filter(p=>p.t>0);
+document.getElementById('score').textContent=score;document.getElementById('hp').textContent=Math.max(0,Math.round(hp));document.getElementById('ammo').textContent=ammo;document.getElementById('wave').textContent=wave;
+if(hp<=0){running=false;document.getElementById('start').style.display='flex';document.querySelector('.card h1').innerHTML='GAME <span style="color:#ff7a00">OVER</span>';document.querySelector('.card p').textContent='Score: '+score+' — Click below to play again.'}
+}
+function draw(){x.clearRect(0,0,W,H);let g=x.createLinearGradient(0,60,0,H);g.addColorStop(0,'#101722');g.addColorStop(1,'#070a0f');x.fillStyle=g;x.fillRect(0,0,W,H);
+x.strokeStyle='#17212e';for(let i=0;i<W;i+=50){x.beginPath();x.moveTo(i,62);x.lineTo(i,H);x.stroke()}for(let j=80;j<H;j+=50){x.beginPath();x.moveTo(0,j);x.lineTo(W,j);x.stroke()}
+for(let p of particles){x.globalAlpha=p.t/.4;x.fillStyle='#ff9b38';x.beginPath();x.arc(p.x,p.y,3,0,7);x.fill()}x.globalAlpha=1;
+for(let b of bullets){x.fillStyle='#ffd18a';x.beginPath();x.arc(b.x,b.y,b.r,0,7);x.fill()}
+for(let e of enemies){x.fillStyle='#e94b4b';x.beginPath();x.arc(e.x,e.y,e.r,0,7);x.fill();x.fillStyle='#111';x.beginPath();x.arc(e.x-5,e.y-2,3,0,7);x.arc(e.x+5,e.y-2,3,0,7);x.fill()}
+let a=Math.atan2(mouse.y-player.y,mouse.x-player.x);x.save();x.translate(player.x,player.y);x.rotate(a);x.fillStyle='#ff7a00';x.fillRect(0,-5,30,10);x.fillStyle='#dbe5f0';x.beginPath();x.arc(0,0,player.r,0,7);x.fill();x.restore();
+}
+document.getElementById('play').onclick=()=>{document.querySelector('.card h1').innerHTML='JK <span style="color:#ff7a00">ARENA</span>';reset()};
+</script></body></html>
